@@ -6,7 +6,10 @@ import { playerInfoHandlers } from './handlers/game/playerInfo';
 import { healthHandlers } from './handlers/game/health';
 import { savingThrowsHandlers } from './handlers/game/savingThrows';
 
-const server = http.createServer();
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('RoleSync Server OK');
+});
 
 const io = new Server(server, {
   cors: {
