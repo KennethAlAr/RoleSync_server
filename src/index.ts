@@ -1,30 +1,42 @@
-import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
-import { config } from './config/env';
+import http from 'http';
+import { Server, Socket } from 'socket.io';
+import { authHandlers } from './handlers/auth';
+import { playerInfoHandlers } from './handlers/game/playerInfo';
+import { healthHandlers } from './handlers/game/health';
+import { savingThrowsHandlers } from './handlers/game/savingThrows';
 
-const app = express();
-const httpServer = createServer(app);
+const server = http.createServer();
 
-// Configuración de WebSockets con CORS abierto para desarrollo
-const io = new Server(httpServer, {
+const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST'],
-  },
+    methods: ['GET', 'POST']
+  }
 });
 
-// Middlewares globales de Express
-app.use(cors());
-app.use(express.json());
+io.on('connection', (socket: Socket) => {
+  console.log(`[+] Nueva conexión detectada: ${socket.id}`);
 
-// Ruta HTTP de prueba para comprobar que el servidor está vivo
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'RoleSync Server' });
+  socket.data.isAuthenticated = false;
+
+  setTimeout(() => {
+    if (!socket.data.isAuthenticated) {
+      console.warn(`[SEGURIDAD] Socket ${socket.id} no se autenticó tras 30s. Desconectando socket.`);
+      socket.disconnect(true);
+    }
+  }, 30000);
+  
+  authHandlers(io, socket);
+  playerInfoHandlers(io, socket);
+  healthHandlers(io, socket);
+  savingThrowsHandlers(io, socket);
+
+  socket.on('disconnect', () => {
+    console.log(`[-] Socket desconectado: ${socket.id}`);
+  });
 });
 
-// Arrancar servidor HTTP
-httpServer.listen(config.port, () => {
-  console.log(`🚀 Servidor RoleSync corriendo en http://localhost:${config.port}`);
+const PORT = 3000;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor RoleSync (Puro WebSocket) iniciado en el puerto ${PORT}`);
 });
