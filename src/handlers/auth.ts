@@ -51,6 +51,8 @@ export function authHandlers(io: Server, socket: Socket) {
     
     // IMPORTANTE: Marcamos el socket del móvil como autenticado
     socket.data.isAuthenticated = true;
+    socket.data.worldId = sessionData.worldId; 
+    socket.data.characterId = sessionData.characterId; 
 
     console.log(`[AUTH] 🟢 Móvil unido a la sala: "${roomName}"`);
 
@@ -96,6 +98,8 @@ export function authHandlers(io: Server, socket: Socket) {
         if (validation && validation.isValid) {
           socket.join(roomName);
           socket.data.isAuthenticated = true; 
+          socket.data.worldId = worldId; 
+          socket.data.characterId = characterId; 
           
           console.log(`[AUTH] 🟢 Token validado. Socket ${socket.id} unido a: "${roomName}"`);
           return callback({ success: true, worldId, characterId });
@@ -106,24 +110,5 @@ export function authHandlers(io: Server, socket: Socket) {
         }
       }
     );
-  });
-
-  // ==========================================
-  // 4. FIX 3: PUENTE DE DATOS (RELAY)
-  // ==========================================
-  // Esto intercepta cualquier evento (ej: UPDATE_HP) y lo reenvía al resto de la sala
-  socket.onAny((eventName, ...args) => {
-    const authEvents = ['GENERATE_OTP', 'REDEEM_OTP', 'AUTHENTICATE_WITH_TOKEN', 'VALIDATE_TOKEN'];
-    
-    // Ignoramos los eventos de autenticación porque ya los manejamos arriba
-    if (authEvents.includes(eventName)) return;
-
-    // Buscamos las salas a las que pertenece el socket (excluyendo su propia id)
-    const rooms = Array.from(socket.rooms).filter(r => r !== socket.id);
-    
-    // Retransmitimos el evento a la sala (si Foundry envía HP, le llega al móvil y viceversa)
-    rooms.forEach(room => {
-      socket.to(room).emit(eventName, ...args);
-    });
   });
 }

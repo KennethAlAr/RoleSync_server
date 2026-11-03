@@ -10,7 +10,7 @@ export function playerInfoHandlers(io: Server, socket: Socket) {
       socket.disconnect(true);
       return null;
     }
-    return `player:${socket.data.worldId}:${socket.data.characterId}`;
+    return `${socket.data.worldId}:${socket.data.characterId}`;
   };
 
   // 1. Foundry -> Móvil (Carga inicial de la ficha base)
