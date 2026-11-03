@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.ts"
+    "start": "tsx src/index.ts"
   },
   "keywords": [],
   "author": "Kenneth Alonso Arce (http://kennethalonso.vercel.app/)",
@@ -19,7 +19,6 @@
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.6",
     "tsx": "^4.23.15",

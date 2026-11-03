@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import http from 'http';
 import { Server, Socket } from 'socket.io';
 import { authHandlers } from './handlers/auth';
@@ -36,7 +37,8 @@ io.on('connection', (socket: Socket) => {
   });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor RoleSync (Puro WebSocket) iniciado en el puerto ${PORT}`);
 });
