@@ -81,22 +81,21 @@ export function authHandlers(io: Server, socket: Socket) {
     target.timeout(5000).emit(
       'VALIDATE_TOKEN', 
       { token, worldId, characterId }, 
-      (err: Error | null, responses: any[]) => {
+      (err: Error | null, responseData: any) => {
         
-        if (err || !responses || responses.length === 0) {
-          console.warn(`[AUTH] ⛔ Timeout de validación. Cerrando socket ${socket.id}`);
+        // Comprobamos si hay error de timeout o si la sala devolvió un array vacío
+        if (err || !responseData || (Array.isArray(responseData) && responseData.length === 0)) {
+          console.warn(`[AUTH] ⛔ Timeout o sin respuesta. Cerrando socket ${socket.id}`);
           callback({ success: false, error: 'Foundry no responde o no está conectado' });
           return socket.disconnect(true);
         }
 
-        const validation = responses[0];
+        // AQUÍ ESTÁ LA SOLUCIÓN: Si es un array sacamos el primer elemento, si no, usamos el objeto directo
+        const validation = Array.isArray(responseData) ? responseData[0] : responseData;
 
         if (validation && validation.isValid) {
           socket.join(roomName);
-          
-          // FIX 2: Autenticamos el socket para que Foundry pueda pedir el OTP luego
           socket.data.isAuthenticated = true; 
-
           console.log(`[AUTH] 🟢 Token validado. Socket ${socket.id} unido a: "${roomName}"`);
           return callback({ success: true, worldId, characterId });
         } else {
