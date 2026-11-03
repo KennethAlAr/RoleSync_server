@@ -74,28 +74,29 @@ export function authHandlers(io: Server, socket: Socket) {
     const roomName = `${worldId}:${characterId}`;
     const room = io.sockets.adapter.rooms.get(roomName);
 
-    // FIX 1: Si la sala está vacía, la validación se la pedimos al propio socket (es Foundry conectándose)
-    // Si la sala tiene gente, le pedimos la validación a la sala (es el móvil conectándose a Foundry)
-    const target = (room && room.size > 0) ? io.to(roomName) : socket;
+    // LA CLAVE: Usamos socket.to(roomName) en lugar de io.to(roomName)
+    // Esto envía el evento a la sala EXCLUYENDO al emisor (el móvil).
+    // Así solo Foundry lo recibe y el timeout no se queda esperando al móvil.
+    const target = (room && room.size > 0) ? socket.to(roomName) : socket;
 
     target.timeout(5000).emit(
       'VALIDATE_TOKEN', 
       { token, worldId, characterId }, 
       (err: Error | null, responseData: any) => {
         
-        // Comprobamos si hay error de timeout o si la sala devolvió un array vacío
         if (err || !responseData || (Array.isArray(responseData) && responseData.length === 0)) {
           console.warn(`[AUTH] ⛔ Timeout o sin respuesta. Cerrando socket ${socket.id}`);
           callback({ success: false, error: 'Foundry no responde o no está conectado' });
           return socket.disconnect(true);
         }
 
-        // AQUÍ ESTÁ LA SOLUCIÓN: Si es un array sacamos el primer elemento, si no, usamos el objeto directo
+        // Si la sala responde, es un Array. Si responde Foundry directo, es objeto.
         const validation = Array.isArray(responseData) ? responseData[0] : responseData;
 
         if (validation && validation.isValid) {
           socket.join(roomName);
           socket.data.isAuthenticated = true; 
+          
           console.log(`[AUTH] 🟢 Token validado. Socket ${socket.id} unido a: "${roomName}"`);
           return callback({ success: true, worldId, characterId });
         } else {
