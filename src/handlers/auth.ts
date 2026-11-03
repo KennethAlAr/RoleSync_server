@@ -111,4 +111,24 @@ export function authHandlers(io: Server, socket: Socket) {
       }
     );
   });
+
+  // ==========================================
+  // 4. SINCRONIZACIÓN INICIAL (HANDSHAKE)
+  // ==========================================
+  // El móvil pide los datos nada más autenticarse, y el servidor se lo pasa a Foundry
+  socket.on('REQUEST_CHARACTER_DATA', (data) => {
+    // Verificamos que el socket que lo pide ya ha pasado por AUTHENTICATE_WITH_TOKEN
+    if (!socket.data.isAuthenticated || !socket.data.worldId || !socket.data.characterId) {
+      console.warn(`[SEGURIDAD] Rechazado REQUEST_CHARACTER_DATA: Socket no autenticado.`);
+      return;
+    }
+
+    const roomName = `${socket.data.worldId}:${socket.data.characterId}`;
+    
+    // Lo enviamos a la sala (lo recibirá Foundry)
+    socket.to(roomName).emit('REQUEST_CHARACTER_DATA', data);
+    console.log(`[AUTH/SYNC] 🔄 Petición de datos iniciales enrutada en "${roomName}"`);
+  });
+
 }
+
