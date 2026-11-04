@@ -130,5 +130,15 @@ export function authHandlers(io: Server, socket: Socket) {
     console.log(`[AUTH/SYNC] 🔄 Petición de datos iniciales enrutada en "${roomName}"`);
   });
 
+  socket.on('REVOKE_TOKEN', (payload) => {
+    console.log(`[AUTH] 🗑️ Revocando token para personaje ${payload.characterId}`);
+    
+    // Opcional pero recomendado: Si tienes alguna base de datos o caché (Redis/Memoria) 
+    // en el servidor donde guardas sesiones activas, bórralo aquí también.
+    
+    // Enrutamos la orden al módulo de Foundry para que lo borre allí
+    io.to(`${payload.worldId}:${payload.characterId}`).emit('REVOKE_TOKEN', payload);
+  });
+
 }
 
