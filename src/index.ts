@@ -37,6 +37,13 @@ io.on('connection', (socket: Socket) => {
 
   socket.on('disconnect', () => {
     console.log(`[-] Socket desconectado: ${socket.id}`);
+    
+    // Si el socket que acaba de morir es Foundry, avisamos a la sala (al móvil)
+    if (socket.data.isAuthenticated && socket.data.clientType === 'foundry') {
+      const roomName = `${socket.data.worldId}:${socket.data.characterId}`;
+      console.log(`[SYNC] 🔴 Foundry desconectado de la sala ${roomName}. Avisando al móvil...`);
+      socket.to(roomName).emit('FOUNDRY_STATUS', { online: false });
+    }
   });
 });
 
