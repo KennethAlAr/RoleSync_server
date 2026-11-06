@@ -12,7 +12,7 @@ Este repositorio es una de las tres piezas que componen el Trabajo de Fin de Gra
 
 1. **RoleSync Server (Este repositorio):** Servidor intermediario que levanta la infraestructura de WebSockets y orquesta las salas. *(Se inicia primero)*.
 
-2. **[RoleSync Foundry Module]():** Módulo instalado en el VTT del Dungeon Master. Genera el código QR de vinculación al detectar el servidor.
+2. **[RoleSync Foundry Module](https://github.com/KennethAlAr/RoleSync_module):** Módulo instalado en el VTT del Dungeon Master. Genera el código QR de vinculación al detectar el servidor.
 
 3. **[RoleSync Mobile App](https://github.com/KennethAlAr/RoleSync_frontend):** Aplicación del jugador. Escanea el QR para establecer el túnel en tiempo real.
 
