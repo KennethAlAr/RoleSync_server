@@ -1,12 +1,22 @@
-// src/handlers/auth.ts
 import { Server, Socket } from 'socket.io';
 import { mobileOtpsMap } from '../store/otpsStore';
 
+/**
+ * Manejadores de Autenticación y Ciclo de Sesión (Auth Handlers).
+ * 
+ * Gestiona el protocolo de emparejamiento seguro y validación de identidad 
+ * entre los clientes (App Móvil) y la fuente de verdad (Módulo Foundry VTT).
+ * Implementa flujos de autenticación de Doble Factor / OTP y control de salas aisladas.
+ */
 export function authHandlers(io: Server, socket: Socket) {
   
-  // 1. Foundry pide un otp para el movil
+  /**
+   * 1. Generación de OTP (One-Time Password).
+   * Solicitada por Foundry VTT para iniciar el proceso de vinculación mediante código QR.
+   * Valida permisos y almacena un token efímero de 6 dígitos con tiempo de vida limitado.
+   */
   socket.on('GENERATE_OTP', (data, callback) => {
-    console.log(`[OTP] 📥 Petición GENERATE_OTP recibida desde el socket ${socket.id}`);
+    console.log(`[OTP] Petición GENERATE_OTP recibida desde el socket ${socket.id}`);
 
     if (!socket.data.isAuthenticated) {
       console.warn(`[SEGURIDAD] ⛔ Rechazado GENERATE_OTP: El socket ${socket.id} no está autenticado.`);
@@ -19,8 +29,10 @@ export function authHandlers(io: Server, socket: Socket) {
       return callback({ success: false, error: 'Faltan datos obligatorios' });
     }
 
+    // Generación de un código numérico aleatorio de 6 dígitos
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
+    // Persistencia efímera en memoria del servidor
     mobileOtpsMap.set(otp, {
       worldId,
       playerId: playerId || 'N/A',
@@ -33,7 +45,11 @@ export function authHandlers(io: Server, socket: Socket) {
     callback({ success: true, otp });
   });
 
-  // 2. El Móvil escanea el QR y canjea el OTP
+  /**
+   * 2. Canjeo de OTP (Mobile Pairing).
+   * Invocado cuando la App Móvil escanea el código QR. Valida el OTP, asocia el socket 
+   * a la sala privada del personaje (`worldId:characterId`) y eleva el nivel de confianza del cliente.
+   */
   socket.on('REDEEM_OTP', (data, callback) => {
     const { otp } = data || {};
     
@@ -44,12 +60,13 @@ export function authHandlers(io: Server, socket: Socket) {
       return callback({ success: false, error: 'OTP inválido o caducado' });
     }
 
+    // Política de uso único (Single-Use Token): Se destruye el OTP inmediatamente tras su lectura
     mobileOtpsMap.delete(otp);
 
     const roomName = `${sessionData.worldId}:${sessionData.characterId}`;
     socket.join(roomName);
     
-    // IMPORTANTE: Marcamos el socket del móvil como autenticado
+    // Elevación de privilegios: Marcamos el socket del móvil como autenticado
     socket.data.isAuthenticated = true;
     socket.data.worldId = sessionData.worldId; 
     socket.data.characterId = sessionData.characterId; 
@@ -64,7 +81,12 @@ export function authHandlers(io: Server, socket: Socket) {
     });
   });
 
-  // 3. Autenticación con token guardado (Reconexión de Móvil o PC)
+  /**
+   * 3. Autenticación Persistente con Token (Reconexión).
+   * Maneja tanto las reconexiones del Módulo de Foundry como las de la App Móvil.
+   * Actúa como un Proxy de Validación: el servidor en la nube delega la comprobación 
+   * criptográfica de los tokens al servidor local de Foundry VTT.
+   */
   socket.on('AUTHENTICATE_WITH_TOKEN', (payload, callback) => {
     const { token, worldId, characterId, clientType } = payload || {};
 
@@ -80,33 +102,33 @@ export function authHandlers(io: Server, socket: Socket) {
     // ==========================================
     if (clientType === 'foundry') {
       
-      // Le pedimos a Foundry que se valide a sí mismo (sin timeout, es local y directo)
+      // Validación local directa contra la instancia de Foundry VTT
       socket.emit('VALIDATE_TOKEN', { token, worldId, characterId }, (validation: any) => {
         if (validation && validation.isValid) {
           
-          // 💀 CAZAFANTASMAS: Limpiar sockets antiguos de Foundry en esta sala
+          // Socket Cleanup: 
+          // Limpia sockets huérfanos anteriores de Foundry en la misma sala para evitar fugas de eventos
           const room = io.sockets.adapter.rooms.get(roomName);
           if (room) {
             for (const socketId of room) {
               const client = io.sockets.sockets.get(socketId);
-              // Si encontramos otro socket que dice ser Foundry, lo cerramos
               if (client && client.data.clientType === 'foundry' && client.id !== socket.id) {
-                console.log(`[SYNC] 👻 Eliminando socket fantasma de Foundry: ${client.id}`);
+                console.log(`[SYNC] Eliminando socket fantasma de Foundry: ${client.id}`);
                 client.disconnect(true);
               }
             }
           }
 
-          // Unimos a Foundry a la sala y le ponemos la etiqueta oficial
+          // Registro oficial de la conexión del Dungeon Master
           socket.join(roomName);
           socket.data.isAuthenticated = true;
-          socket.data.clientType = 'foundry'; // Etiqueta vital
+          socket.data.clientType = 'foundry';
           socket.data.worldId = worldId;
           socket.data.characterId = characterId;
 
           console.log(`[AUTH] 🟢 Foundry conectado. Socket ${socket.id} unido a: "${roomName}"`);
           
-          // Avisamos al móvil (si está conectado) de que Foundry acaba de entrar
+          // Notificación de presencia en tiempo real al cliente móvil vinculado
           socket.to(roomName).emit('FOUNDRY_STATUS', { online: true });
           
           return callback({ success: true, worldId, characterId });
@@ -125,18 +147,18 @@ export function authHandlers(io: Server, socket: Socket) {
       const room = io.sockets.adapter.rooms.get(roomName);
       let foundrySocket: any = null;
 
-      // Buscamos a Foundry en la sala
+      // Localiza el nodo de Foundry activo dentro de la sala de la partida
       if (room) {
         for (const socketId of room) {
           const client = io.sockets.sockets.get(socketId);
           if (client && client.data.clientType === 'foundry') {
             foundrySocket = client;
-            break; // Lo encontramos
+            break; 
           }
         }
       }
 
-      // Si Foundry está en la sala, le pasamos el token del móvil
+      // Si Foundry está presente, le delegamos la validación del token del móvil mediante RPC (Remote Procedure Call)
       if (foundrySocket) {
         
         foundrySocket.timeout(5000).emit('VALIDATE_TOKEN', { token, worldId, characterId }, (err: Error | null, responseData: any) => {
@@ -155,9 +177,9 @@ export function authHandlers(io: Server, socket: Socket) {
             socket.data.worldId = worldId;
             socket.data.characterId = characterId;
 
-            console.log(`[AUTH] 📱 Móvil conectado. Socket ${socket.id} unido a: "${roomName}"`);
+            console.log(`[AUTH] Móvil conectado. Socket ${socket.id} unido a: "${roomName}"`);
             
-            // Le decimos al móvil que Foundry está online ya que acaba de responderle
+            // Confirma al móvil el estado activo de Foundry
             socket.emit('FOUNDRY_STATUS', { online: true });
             
             return callback({ success: true, worldId, characterId });
@@ -169,7 +191,7 @@ export function authHandlers(io: Server, socket: Socket) {
         });
 
       } else {
-        // Si Foundry no está en la sala, el móvil no puede entrar por seguridad
+        // Política de seguridad: Si el PC del jugador está apagado, el móvil no puede establecer sesión
         console.warn(`[AUTH] ⛔ Móvil intentó conectar pero Foundry no está online.`);
         callback({ success: false, error: 'Foundry no está online para validar el token' });
         return socket.disconnect(true);
@@ -178,32 +200,31 @@ export function authHandlers(io: Server, socket: Socket) {
   });
 
   // ==========================================
-  // 4. SINCRONIZACIÓN INICIAL (HANDSHAKE)
+  // 4. SINCRONIZACIÓN INICIAL Y REVOCACIÓN
   // ==========================================
-  // El móvil pide los datos nada más autenticarse, y el servidor se lo pasa a Foundry
+  
+  /**
+   * Petición de rehidratación inicial de datos del personaje.
+   * Enruta el evento desde el móvil hacia la instancia de Foundry VTT dentro de la sala.
+   */
   socket.on('REQUEST_CHARACTER_DATA', (data) => {
-    // Verificamos que el socket que lo pide ya ha pasado por AUTHENTICATE_WITH_TOKEN
     if (!socket.data.isAuthenticated || !socket.data.worldId || !socket.data.characterId) {
       console.warn(`[SEGURIDAD] Rechazado REQUEST_CHARACTER_DATA: Socket no autenticado.`);
       return;
     }
 
     const roomName = `${socket.data.worldId}:${socket.data.characterId}`;
-    
-    // Lo enviamos a la sala (lo recibirá Foundry)
     socket.to(roomName).emit('REQUEST_CHARACTER_DATA', data);
-    console.log(`[AUTH/SYNC] 🔄 Petición de datos iniciales enrutada en "${roomName}"`);
+    console.log(`[AUTH/SYNC] Petición de datos iniciales enrutada en "${roomName}"`);
   });
 
+  /**
+   * Destrucción de credenciales (Logout).
+   * Notifica tanto al servidor como al módulo de Foundry para revocar el token activo.
+   */
   socket.on('REVOKE_TOKEN', (payload) => {
-    console.log(`[AUTH] 🗑️ Revocando token para personaje ${payload.characterId}`);
-    
-    // Opcional pero recomendado: Si tienes alguna base de datos o caché (Redis/Memoria) 
-    // en el servidor donde guardas sesiones activas, bórralo aquí también.
-    
-    // Enrutamos la orden al módulo de Foundry para que lo borre allí
+    console.log(`[AUTH] Revocando token para personaje ${payload.characterId}`);
     io.to(`${payload.worldId}:${payload.characterId}`).emit('REVOKE_TOKEN', payload);
   });
 
 }
-
