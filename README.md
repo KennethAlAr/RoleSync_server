@@ -1,3 +1,7 @@
+# ¿Qué es RoleSync?
+
+RoleSync es un ecosistema interactivo diseñado para modernizar las partidas de rol de mesa. Conecta en tiempo real el tablero virtual de Foundry VTT con los teléfonos móviles de los jugadores, convirtiendo sus dispositivos en hojas de personaje interactivas. El sistema permite realizar tiradas, actualizar puntos de vida y gestionar el estado del combate de forma sincronizada bidireccionalmente y sin latencia.
+
 # RoleSync - Server
 
 ![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
