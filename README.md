@@ -31,7 +31,7 @@ Para ejecutar o contribuir al desarrollo de este servidor, es necesario disponer
 
 1. **Clonar el repositorio:**
    ```bash
-   git clone https://github.com/tu-usuario/rolesync-server.git
+   git clone https://github.com/KennethAlAr/rolesync-server.git
    cd rolesync-server
    ```
 
