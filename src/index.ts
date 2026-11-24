@@ -75,7 +75,7 @@ io.on('connection', (socket: Socket) => {
     // localizamos su sala específica y notificamos al cliente móvil asociado.
     if (socket.data.isAuthenticated && socket.data.clientType === 'foundry') {
       const roomName = `${socket.data.worldId}:${socket.data.characterId}`;
-      console.log(`[SYNC] 🔴 Foundry desconectado de la sala ${roomName}. Avisando al móvil...`);
+      console.log(`[SYNC] 🔴 Dispositivo desconectado de la sala ${roomName}.`);
       
       // Emite exclusivamente a los integrantes de la sala, ahorrando ancho de banda global
       socket.to(roomName).emit('FOUNDRY_STATUS', { online: false });
